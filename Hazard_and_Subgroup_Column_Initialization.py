@@ -1,18 +1,22 @@
 import pandas as pd
 import re
-
+import numpy as np
 
 import sub_groups_from_smiles as subgroups
-import Data_Collection_from_Pubchem as pbchem_coll
+import Data_Collection_from_Pubchem as pubchem_coll
 
 
 
 def create_dataframe_from_ids(compound_IDs: list,
-                              save_to_csv: bool=True, wait_time: float = 1.5) -> pd.DataFrame|bool:
+                              save_to_csv: bool=True, csv_name: str= 'compound_data.csv', wait_time: float=1,
+                              drop_empty_hazard_rows: bool=True) -> pd.DataFrame|bool:
     """
     Input: compound_IDs list of ints representing compound IDs. save_to_csv bool to determine whether to
            save dataframe to csv or not, default is True. wait_time is a float value of the desired wait time between
-           requests in seconds
+           requests in seconds. drop_empty_hazard_rows is a bool that is True by default. drops rows in the columns that
+           do not have any hazard data associated with them. This is due to the inability to differentiate between
+           chemicals that have no hazards because they are safe and chemicals that have no hazards because there simply
+           is not enough data.
     Output: pd.DataFrame of compound data including a column for each type of hazard, and columns of group
             and group combination hash keys
     """
@@ -23,7 +27,7 @@ def create_dataframe_from_ids(compound_IDs: list,
 
         # Loop through each compound ID and fetch data
         for compound_ID in compound_IDs:
-            compound_data = pbchem_coll.fetch_compound_data(compound_ID, wait_time)
+            compound_data = pubchem_coll.fetch_compound_data(compound_ID, wait_time)
 
             all_data.append(compound_data)
 
@@ -32,9 +36,15 @@ def create_dataframe_from_ids(compound_IDs: list,
         # Collect grouping data
         initialize_grouping_data(df)
 
+        # Removes rows that don't have any hazards attached. Currently, there is no way to differentiate
+        # between that chemicals that are safe, and chemicals that simply do not have any hazard data.
+        if drop_empty_hazard_rows:
+            df = df[df['Hazards'] != '']
+
         # Save for later use
         if save_to_csv:
-            df.to_csv('compound_data.csv', index=False)
+            print("made it")
+            df.to_csv(csv_name, index=False)
 
         return df
     except ValueError:
@@ -42,56 +52,16 @@ def create_dataframe_from_ids(compound_IDs: list,
 
 
 
-def update_existing_ids_dataframe(main_df: pd.DataFrame, new_compound_IDs: list,
-                                   save_to_csv: bool=True, overwrite_old_data: bool=False) -> pd.DataFrame|bool:
-    """
-    Input: main_df is a pd.DataFrame that will be mutated to include new data. new_compound_IDS is list of ints
-           representing compound IDs.  save_to_csv bool to determine whether to
-           save dataframe to csv or not, default is True. overwrite_old_data is a bool that determine whether data for
-           old compound IDs can
-           be overwritten by new data. overwrite_old_data is False by default
-    Output: The merged pd.DataFrame if parent_dataframe was successfully mutated to include new compound IDs, False
-            otherwise
-    """
-
-    try:
-        new_df = create_dataframe_from_ids(new_compound_IDs, False)
-    except ValueError:
-        print("Issue with new compound IDs")
-        return False
-
-    try:
-
-        if overwrite_old_data:
-            main_df = main_df[~main_df['Compound ID'].isin(new_df['Compound ID'])]
-        else:
-            new_df = new_df[~new_df['Compound ID'].isin(main_df['Compound ID'])]
-
-        updated_df = pd.concat([main_df, new_df], axis=0, ignore_index=True).fillna(0)
-
-
-        if save_to_csv:
-            updated_df.to_csv('compound_data.csv', index=False)
-
-        return updated_df
-
-    except ValueError:
-        print("Issue combining dataframes")
-        return False
-
-
-
-
-
-def generate_grouping_hash_lists(df: pd.DataFrame, Canonical_SMILES_column_name: str="Canonical SMILES",
-                                 create_columns: bool=True) -> bool:
+def generate_grouping_hash_lists_from_df(df: pd.DataFrame,
+                                         Canonical_SMILES_column_name: str="Canonical SMILES",
+                                         create_columns: bool=True) -> bool:
     """
     Input: df is a pd.DataFrame including a column of Canonical SMILES strings. Canonical_SMILES_column_name is the
            column name of the column containing the Canonical SMILES strings, it is "Canonical SMILES" by default.
            create_columns is a bool that determines if the columns "smiles_group_hash_list",
            "smiles_group_combination_hash_list", and "could_not_collect_grouping_data" need to be initialized.
            create_columns is True by default
-    Output: bool that is True if columns where successfully created and or updated to include hash lists, False
+    Output: bool that is True if columns were successfully created and/or updated to include hash lists, False
             otherwise
     """
 
@@ -101,35 +71,106 @@ def generate_grouping_hash_lists(df: pd.DataFrame, Canonical_SMILES_column_name:
             df["smiles_group_combination_hash_list"] = [[] for _ in range(len(df))]
             df["could_not_collect_grouping_data"] = 0
 
-
         for index, row in df.iterrows():
             canonical_smiles = row[Canonical_SMILES_column_name]
-            group_list_info = subgroups.smiles_to_sub_groups(canonical_smiles)
-            if group_list_info == 1:
+
+            group_hash_lists = generate_grouping_hash_lists_from_SMILES_string(canonical_smiles)
+
+            if group_hash_lists == False:
                 df.at[index, "could_not_collect_grouping_data"] = 1
                 continue
 
-            group_list = group_list_info[0]
-            group_combination_list = group_list_info[1]
+            smiles_group_hash_list = group_hash_lists[0]
+            smiles_group_combination_hash_list = group_hash_lists[1]
 
-            smiles_group_hash_list = []
-            smiles_group_combination_hash_list = []
+            df.at[index, "smiles_group_hash_list"] = smiles_group_hash_list
+            df.at[index, "smiles_group_combination_hash_list"] = smiles_group_combination_hash_list
 
-            # get data for individual groups
-            for group in group_list:
-                group_hash_key = hash_smiles_group(group)
-                smiles_group_hash_list.append(group_hash_key)
-
-            for group_combo in group_combination_list:
-                group_combo_hash_key = hash_smiles_group_combination(group_combo)
-                smiles_group_combination_hash_list.append(group_combo_hash_key)
-
-            df.at[index, "smiles_group_hash_list"] = smiles_group_combination_hash_list
-            df.at[index, "smiles_group_combination_hash_list"] = smiles_group_hash_list
-
-            return True
+        return True
     except ValueError:
         return False
+
+
+
+def generate_grouping_hash_lists_from_SMILES_string(canonical_smiles: str) -> tuple|bool:
+    """
+    Input: canonical_smiles of type str
+    Output: tuple containing a hashlist of the different subgroups at index 0, and a hashlist of the different subgroup
+            combinations at index 1. False if no subgroups could be pulled
+    """
+    group_list_info = subgroups.smiles_to_sub_groups(canonical_smiles)
+
+    # group data could not be pulled
+    if not group_list_info:
+        return False
+
+    group_list = group_list_info[0]
+    group_combination_list = group_list_info[1]
+
+    smiles_group_hash_list = []
+    smiles_group_combination_hash_list = []
+
+    # get data for individual groups
+    for group in group_list:
+        group_hash_key = hash_smiles_group(group)
+        smiles_group_hash_list.append(group_hash_key)
+
+    # get data for group combinations
+    for group_combo in group_combination_list:
+        group_combo_hash_key = hash_smiles_group_combination(group_combo)
+        smiles_group_combination_hash_list.append(group_combo_hash_key)
+
+    return smiles_group_hash_list, smiles_group_combination_hash_list
+
+
+
+def convert_smiles_to_dataframe(canonical_smiles: str) -> pd.DataFrame:
+    """
+    Input: canonical_smiles is a string.
+    Output: A pd.DataFrame with only one row referring to canonical_smiles. pd.Dataframe contains columns of the
+            hashed subgroups and subgroup combinations
+    """
+
+    hash_dict = {}
+    hash_lists = generate_grouping_hash_lists_from_SMILES_string(canonical_smiles)
+    hash_lists_combined = hash_lists[0] + hash_lists[1]
+    for hash in hash_lists_combined:
+        if hash in hash_dict:
+            hash_dict[hash][0] += 1
+        else:
+            hash_dict[hash] = [1]
+
+    df = pd.DataFrame(hash_dict)
+
+    return df
+
+
+
+def fit_dataframes(this_smiles_df: pd.DataFrame, cleaned_main_df: pd.DataFrame) -> tuple:
+    """
+    Input: this_smiles_df is a pd.DataFrame. cleaned_main_df is a pd.DataFrame
+    Output: tuple containing this_smiles_df at index 0 and cleaned_main_df where both dataframes have each other's
+            columns added and set to zero. Both DataFrames have the same columns and are in the same order
+    """
+
+    # Get the union of all columns from both dataframes
+    all_columns = set(this_smiles_df.columns).union(set(cleaned_main_df.columns))
+
+    # Add missing columns to this_smiles_df and initialize them to 0
+    for col in all_columns:
+        if col not in this_smiles_df.columns:
+            this_smiles_df[col] = 0
+
+    # Add missing columns to cleaned_main_df and initialize them to 0
+    for col in all_columns:
+        if col not in cleaned_main_df.columns:
+            cleaned_main_df[col] = 0
+
+    # Reorder the columns of this_smiles_df to match cleaned_main_df
+    this_smiles_df = this_smiles_df[cleaned_main_df.columns]
+
+    # Now both dataframes have the same columns in the same order
+    return (this_smiles_df, cleaned_main_df)
 
 
 
@@ -159,7 +200,7 @@ def hash_smiles_group(subgroup: str,
 
     if not rotation_matters or is_ring:
         rotations = [subgroup[i:] + subgroup[:i] for i in range(len(subgroup))]
-        pre_hashed_key = is_ring + min(rotations)
+        pre_hashed_key = str(is_ring) + min(rotations)
 
     else:
         pre_hashed_key = str(is_ring) + subgroup
@@ -211,8 +252,6 @@ def create_grouping_columns(df: pd.DataFrame,
                     df[hash_key] = 0  # Initialize the new column with zeros
                     df.at[index, hash_key] = 1
 
-        return True
-
     except ValueError:
         return False
 
@@ -228,7 +267,7 @@ def initialize_grouping_data(df: pd.DataFrame,
 
     try:
         split_hazard_data(df)
-        generate_grouping_hash_lists(df, Canonical_SMILES_column_name)
+        generate_grouping_hash_lists_from_df(df, Canonical_SMILES_column_name)
         create_grouping_columns(df)
         return True
     except ValueError:
@@ -257,7 +296,7 @@ def split_hazard_data(df: pd.DataFrame,
                 # Check if the column exists
                 if hazard in df.columns:
                     # Set row value to True
-                    df.at[index, hazard] = True
+                    df.at[index, hazard] = 1
 
                 else:
                     # Create a new column and initialize it
@@ -265,6 +304,111 @@ def split_hazard_data(df: pd.DataFrame,
                     df.at[index, hazard] = 1   # set this row's value to 1 to represent True
 
         return True
-
     except ValueError:
         return False
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Scrapped functions, may add in future
+
+def update_existing_ids_dataframe_from_cids(main_df: pd.DataFrame, new_compound_IDs: list,
+                                            save_to_csv: bool=True, csv_name: str="compound_data.csv",
+                                            overwrite_old_data: bool=False) -> pd.DataFrame|bool:
+    """
+    Input: main_df is a pd.DataFrame that will be mutated to include new data. new_compound_IDS is list of ints
+           representing compound IDs.  save_to_csv bool to determine whether to
+           save dataframe to csv or not, default is True. overwrite_old_data is a bool that determine whether data for
+           old compound IDs can
+           be overwritten by new data. overwrite_old_data is False by default
+    Output: The merged pd.DataFrame if parent_dataframe was successfully mutated to include new compound IDs, False
+            otherwise
+    """
+
+    try:
+        new_df = create_dataframe_from_ids(new_compound_IDs, save_to_csv=False)
+    except ValueError:
+        print("Issue with new compound IDs")
+        return False
+
+    try:
+        update_existing_dataframe_from_dataframe(main_df, new_df)
+
+    except ValueError:
+        print("Issue combining dataframes")
+        return False
+
+def update_existing_dataframe_from_dataframe(main_df: pd.DataFrame, second_df: pd.DataFrame,
+                                             save_to_csv: bool=True, csv_name: str="compound_data.csv",
+                                             overwrite_old_data: bool=False) -> pd.DataFrame|bool:
+    """
+    Input: main_df is a pd.DataFrame that will be mutated to include new data. new_compound_IDS is list of ints
+           representing compound IDs.  save_to_csv bool to determine whether to
+           save dataframe to csv or not, default is True. overwrite_old_data is a bool that determine whether data for
+           old compound IDs can
+           be overwritten by new data. overwrite_old_data is False by default
+    Output: The merged pd.DataFrame if parent_dataframe was successfully mutated to include new compound IDs, False
+            otherwise
+    """
+
+    try:
+        if "Compound ID" not in main_df.columns or "Compound ID" not in second_df.columns:
+            raise ValueError("Both dataframes must have a 'Compound ID' column")
+
+
+        if overwrite_old_data:
+
+            matching_ids = second_df["Compound ID"].isin(main_df["Compound ID"])
+            matching_rows = second_df[matching_ids]
+
+            # this is what will be iterated over to add missing columns
+
+            second_df = second_df[~matching_ids]
+            main_df = main_df.set_index("Compound ID")
+            matching_rows = matching_rows.set_index("Compound ID")
+            main_df.update(matching_rows)
+            main_df = main_df.reset_index()
+
+        else:
+            # filters out rows in second_df that have matching "Compound ID" with values in main_df
+            second_df = second_df[~second_df["Compound ID"].isin(main_df["Compound ID"])]
+
+
+        # Step 1: Add missing columns from main_df to second_df and set them to 0
+        for col in main_df.columns:
+            if col not in second_df.columns:
+                second_df[col] = 0
+
+        # Step 2: Add missing columns from second_df to main_df and set them to 0
+        for col in second_df.columns:
+            if col not in main_df.columns:
+                main_df[col] = 0
+
+        # Step 3: Ensure both dataframes have the same columns and order
+        main_df = main_df[sorted(main_df.columns)]
+        second_df = second_df[sorted(second_df.columns)]
+
+        # Step 4: Concatenate the dataframes
+        combined_df = pd.concat([main_df, second_df], ignore_index=True)
+
+        if save_to_csv:
+            combined_df.to_csv(csv_name, index=False)
+
+
+
+        return combined_df
+
+    except ValueError:
+        print("Issue combining dataframes")
+        return False
+
