@@ -19,6 +19,6 @@ def get_data_file(filename):
 
 
 __all__ = [
-    'determine_potential_hazards_from_dataframe', 'hazard_model_testing', 'create_dataframe_from_ids',
+    'determine_potential_hazards_from_dataframe', 'hazard_model_testing', 'create_dataframe_from_cids',
     'update_existing_dataframe_from_dataframe', 'update_existing_ids_dataframe_from_cids'
 ]
