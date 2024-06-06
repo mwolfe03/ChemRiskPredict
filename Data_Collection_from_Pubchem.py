@@ -3,15 +3,15 @@ import time
 
 
 
-def fetch_compound_data(compound_ID: int, wait_time: float) -> dict:
+def fetch_compound_data(compound_ID: int, wait_time: float=1.5) -> dict:
     """
     Input: compound_ID is an int representation of the compound ID. wait_time is a float value of the desired
-    wait time between requests in seconds
+    wait time between requests in seconds. wait_time is 1.5 seconds by default
     Output: dictionary containing compound info including Canonical Smiles, and Hazards
     """
 
     url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug_view/data/compound/{compound_ID}/JSON/"
-    response = requests.get(url)
+    response = requests.get(url, timeout=10)
 
     # cool down inbetween calls
     time.sleep(wait_time)

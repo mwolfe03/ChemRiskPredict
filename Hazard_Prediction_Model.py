@@ -19,7 +19,7 @@ except FileNotFoundError:
 try:
     default_testing_data_df = pd.read_csv("default_testing_compound_data.csv")
 except FileNotFoundError:
-    default_data_df = None
+    default_testing_data_df = None
 
 
 
@@ -51,8 +51,10 @@ def determine_potential_hazards_from_dataframe(canonical_smiles: str,
     this_smiles_finished_df.columns = this_smiles_finished_df.columns.astype(str)
     finished_main_df.columns = finished_main_df.columns.astype(str)
 
-    nn_model = NearestNeighbors(n_neighbors=num_neighbors, algorithm=algorithm).fit(finished_main_df)
-    neighbors_indices = nn_model.kneighbors(this_smiles_finished_df)[1]
+    nn_model = NearestNeighbors(n_neighbors=num_neighbors, algorithm=algorithm, metric="cosine").fit(finished_main_df)
+    stuff = nn_model.kneighbors(this_smiles_finished_df)
+    neighbors_indices = stuff[1]
+    neighbor_scores = stuff[0]
 
     hazard_probability_dict = pull_hazards_from_dataframe(neighbors_indices[0], main_df_cloned)
 
@@ -135,7 +137,7 @@ def pull_hazards_from_dataframe(index_list: list, main_df: pd.DataFrame,
         hazard_list = ["AcuteToxic", "Flammable", "HealthHazard", "Irritant", "Corrosive",
                        "EnvironmentalHazard", "CompressedGas"]
 
-    filtered_df = main_df.loc[index_list]
+    filtered_df = main_df.iloc[index_list]
     len_index_list = len(index_list) # this is the number of neighbors we are using
     hazard_probability_dict = {}
 

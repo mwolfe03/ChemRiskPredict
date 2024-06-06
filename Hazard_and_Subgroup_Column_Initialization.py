@@ -1,7 +1,6 @@
 import pandas as pd
 import re
 
-
 import sub_groups_from_smiles as subgroups
 import Data_Collection_from_Pubchem as pubchem_coll
 
@@ -13,7 +12,6 @@ warnings.filterwarnings("ignore", category=pd.errors.PerformanceWarning)
 warnings.simplefilter('ignore', category=pd.errors.SettingWithCopyWarning)
 # this gets raised by .applymap(), but the version of pandas on google collab crashes using .map()
 warnings.simplefilter('ignore', category=FutureWarning)
-
 
 
 
@@ -54,7 +52,7 @@ def create_dataframe_from_cids(compound_IDs: list,
         # Save for later use
         if save_to_csv:
             df.to_csv(csv_name, index=False)
-        columns_to_remove = ["Hazards", "smiles_group_hash_list", "smiles_group_combination_hash_list"]
+        columns_to_remove = ["smiles_group_hash_list", "smiles_group_combination_hash_list"]
         df = df.drop(columns=columns_to_remove, errors='ignore')
 
         return df
@@ -164,24 +162,24 @@ def fit_dataframes(this_smiles_df: pd.DataFrame, cleaned_main_df: pd.DataFrame) 
             columns added and set to zero. Both DataFrames have the same columns and are in the same order
     """
 
-    # Get the union of all columns from both dataframes
-    all_columns = set(this_smiles_df.columns).union(set(cleaned_main_df.columns))
+    # removes all columns not in this_smiles_df that are sum to less than 2
+    cleaned_filtered_main_df = filter_columns_by_sum_and_input(cleaned_main_df, this_smiles_df)
 
-    # Add missing columns to this_smiles_df and initialize them to 0
-    for col in all_columns:
-        if col not in this_smiles_df.columns:
-            this_smiles_df[col] = 0
+    # Get the common columns between this_smiles_df and cleaned_main_df
+    common_columns = this_smiles_df.columns.intersection(cleaned_main_df.columns)
 
-    # Add missing columns to cleaned_main_df and initialize them to 0
-    for col in all_columns:
-        if col not in cleaned_main_df.columns:
-            cleaned_main_df[col] = 0
+    # Only keep the common columns in this_smiles_df
+    this_smiles_df = this_smiles_df[common_columns]
 
+    # Add missing columns from cleaned_filtered_main_df to this_smiles_df and set their values to zero
+    missing_columns = [col for col in cleaned_filtered_main_df.columns if col not in this_smiles_df.columns]
+    for col in missing_columns:
+        this_smiles_df[col] = 0
+
+    this_smiles_df = this_smiles_df[cleaned_filtered_main_df.columns]
     # Reorder the columns of this_smiles_df to match cleaned_main_df
-    this_smiles_df = this_smiles_df[cleaned_main_df.columns]
 
-    # Now both dataframes have the same columns in the same order
-    return (this_smiles_df, cleaned_main_df)
+    return (this_smiles_df, cleaned_filtered_main_df)
 
 
 
@@ -216,7 +214,8 @@ def hash_smiles_group(subgroup: str,
     else:
         pre_hashed_key = str(is_ring) + subgroup
 
-    return hash(pre_hashed_key)
+    hashed = hash(pre_hashed_key)
+    return hashed
 
 
 
@@ -341,7 +340,7 @@ def update_existing_ids_dataframe_from_cids(main_df: pd.DataFrame, new_compound_
         return False
 
     try:
-        return update_existing_dataframe_from_dataframe(main_df, new_df, save_to_csv=True, csv_name=csv_name)
+        return update_existing_dataframe_from_dataframe(main_df, new_df, save_to_csv=save_to_csv, csv_name=csv_name, overwrite_old_data=overwrite_old_data)
 
     except ValueError:
         print("Issue combining dataframes")
@@ -365,7 +364,6 @@ def update_existing_dataframe_from_dataframe(main_df: pd.DataFrame, second_df: p
         if "Compound ID" not in main_df.columns or "Compound ID" not in second_df.columns:
             raise ValueError("Both dataframes must have a 'Compound ID' column")
 
-
         if overwrite_old_data:
 
             matching_ids = second_df["Compound ID"].isin(main_df["Compound ID"])
@@ -382,7 +380,6 @@ def update_existing_dataframe_from_dataframe(main_df: pd.DataFrame, second_df: p
         else:
             # filters out rows in second_df that have matching "Compound ID" with values in main_df
             second_df = second_df[~second_df["Compound ID"].isin(main_df["Compound ID"])]
-
 
         # Step 1: Add missing columns from main_df to second_df and set them to 0
         for col in main_df.columns:
@@ -404,10 +401,21 @@ def update_existing_dataframe_from_dataframe(main_df: pd.DataFrame, second_df: p
         if save_to_csv:
             combined_df.to_csv(csv_name, index=False)
 
-
-
         return combined_df
 
     except ValueError:
         print("Issue combining dataframes")
         return False
+
+
+
+def filter_columns_by_sum_and_input(main_df: pd.DataFrame, second_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Input: main_df is a pd.DataFrame, second_df pd.DataFrame
+    Output: updated main_df that contains only columns that have more than one "1" or are present in second_df
+    """
+    columns_to_keep = []
+    for col in main_df.columns:
+        if main_df[col].sum() >= 2 or col in second_df.columns:
+            columns_to_keep.append(col)
+    return main_df[columns_to_keep]
