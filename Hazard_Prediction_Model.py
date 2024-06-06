@@ -240,5 +240,3 @@ def hazard_model_testing(testing_df: pd.DataFrame=default_testing_data_df,
 
     hazard_probability_df = pd.DataFrame([hazard_accuracy_dict, hazard_false_pos_dict, hazard_false_neg_dict])
     return hazard_probability_df
-
-print(hazard_model_testing())
