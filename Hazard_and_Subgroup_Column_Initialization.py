@@ -10,6 +10,7 @@ import warnings
 # Suppress the specific PerformanceWarning from pandas
 # These performance errors will be looked into in the future, but for now it works
 warnings.filterwarnings("ignore", category=pd.errors.PerformanceWarning)
+warnings.simplefilter('ignore', category=pd.errors.SettingWithCopyWarning)
 
 
 
