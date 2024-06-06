@@ -63,7 +63,14 @@ def determine_potential_hazards_from_dataframe(canonical_smiles: str,
         else:
             hazard_probability_dict[hazard] = [0]
 
+    hazard_probability_dict["Canonical SMILES"] = canonical_smiles
+
     this_smiles_hazard_df = pd.DataFrame(hazard_probability_dict)
+
+    # Puts Canonical SMILES column first
+    cols = this_smiles_hazard_df.columns.tolist()
+    cols = ["Canonical SMILES"] + [col for col in cols if col != "Canonical SMILES"]
+    this_smiles_hazard_df = this_smiles_hazard_df[cols]
 
     return this_smiles_hazard_df
 
@@ -100,7 +107,7 @@ def clean_data_frame(main_df: pd.DataFrame,
     # Ex: if group_counts_matters is True, then a molecule containing 100 =O groups and a molecule
     # containing 1 =O group will have both be set to 1 for  the column corresponding to =O
     if not group_counts_matters:
-        training_df = training_df.applymap(lambda x: 1 if x != 0 else 0)
+            training_df = training_df.applymap(lambda x: 1 if x != 0 else 0)
 
 
     # Calculate the number of non-zero values for each column
@@ -238,3 +245,5 @@ def hazard_model_testing(testing_df: pd.DataFrame=default_testing_data_df,
 
     hazard_probability_df = pd.DataFrame([hazard_accuracy_dict, hazard_false_pos_dict, hazard_false_neg_dict])
     return hazard_probability_df
+
+print(hazard_model_testing())

@@ -1,13 +1,20 @@
 import pandas as pd
 import re
-import numpy as np
+
 
 import sub_groups_from_smiles as subgroups
 import Data_Collection_from_Pubchem as pubchem_coll
 
+import warnings
+
+# Suppress the specific PerformanceWarning from pandas
+# These performance errors will be looked into in the future, but for now it works
+warnings.filterwarnings("ignore", category=pd.errors.PerformanceWarning)
 
 
-def create_dataframe_from_ids(compound_IDs: list,
+
+
+def create_dataframe_from_cids(compound_IDs: list,
                               save_to_csv: bool=True, csv_name: str= 'compound_data.csv', wait_time: float=1,
                               drop_empty_hazard_rows: bool=True) -> pd.DataFrame|bool:
     """
@@ -43,8 +50,9 @@ def create_dataframe_from_ids(compound_IDs: list,
 
         # Save for later use
         if save_to_csv:
-            print("made it")
             df.to_csv(csv_name, index=False)
+        columns_to_remove = ["Hazards", "smiles_group_hash_list", "smiles_group_combination_hash_list"]
+        df = df.drop(columns=columns_to_remove, errors='ignore')
 
         return df
     except ValueError:
@@ -309,19 +317,6 @@ def split_hazard_data(df: pd.DataFrame,
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-# Scrapped functions, may add in future
-
 def update_existing_ids_dataframe_from_cids(main_df: pd.DataFrame, new_compound_IDs: list,
                                             save_to_csv: bool=True, csv_name: str="compound_data.csv",
                                             overwrite_old_data: bool=False) -> pd.DataFrame|bool:
@@ -336,7 +331,7 @@ def update_existing_ids_dataframe_from_cids(main_df: pd.DataFrame, new_compound_
     """
 
     try:
-        new_df = create_dataframe_from_ids(new_compound_IDs, save_to_csv=False)
+        new_df = create_dataframe_from_cids(new_compound_IDs, save_to_csv=False)
     except ValueError:
         print("Issue with new compound IDs")
         return False
@@ -348,15 +343,16 @@ def update_existing_ids_dataframe_from_cids(main_df: pd.DataFrame, new_compound_
         print("Issue combining dataframes")
         return False
 
+
+
 def update_existing_dataframe_from_dataframe(main_df: pd.DataFrame, second_df: pd.DataFrame,
                                              save_to_csv: bool=True, csv_name: str="compound_data.csv",
                                              overwrite_old_data: bool=False) -> pd.DataFrame|bool:
     """
-    Input: main_df is a pd.DataFrame that will be mutated to include new data. new_compound_IDS is list of ints
-           representing compound IDs.  save_to_csv bool to determine whether to
-           save dataframe to csv or not, default is True. overwrite_old_data is a bool that determine whether data for
-           old compound IDs can
-           be overwritten by new data. overwrite_old_data is False by default
+    Input: main_df is a pd.DataFrame that will be mutated to include new data. second_df is a pd.DataFrame that will be
+           used to update main_df. save_to_csv bool to determine whether to save dataframe to csv or not, default is
+           True. overwrite_old_data is a bool that determine whether data for old compound IDs can be overwritten by
+           new data. overwrite_old_data is False by default
     Output: The merged pd.DataFrame if parent_dataframe was successfully mutated to include new compound IDs, False
             otherwise
     """
@@ -395,8 +391,8 @@ def update_existing_dataframe_from_dataframe(main_df: pd.DataFrame, second_df: p
                 main_df[col] = 0
 
         # Step 3: Ensure both dataframes have the same columns and order
-        main_df = main_df[sorted(main_df.columns)]
-        second_df = second_df[sorted(second_df.columns)]
+        main_df = main_df[sorted(main_df.columns, key=str)]
+        second_df = second_df[sorted(second_df.columns, key=str)]
 
         # Step 4: Concatenate the dataframes
         combined_df = pd.concat([main_df, second_df], ignore_index=True)
@@ -411,4 +407,3 @@ def update_existing_dataframe_from_dataframe(main_df: pd.DataFrame, second_df: p
     except ValueError:
         print("Issue combining dataframes")
         return False
-
