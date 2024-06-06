@@ -100,7 +100,7 @@ def clean_data_frame(main_df: pd.DataFrame,
     # Ex: if group_counts_matters is True, then a molecule containing 100 =O groups and a molecule
     # containing 1 =O group will have both be set to 1 for  the column corresponding to =O
     if not group_counts_matters:
-        training_df = training_df.map(lambda x: 1 if x != 0 else 0)
+        training_df = training_df.applymap(lambda x: 1 if x != 0 else 0)
 
 
     # Calculate the number of non-zero values for each column
