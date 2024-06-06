@@ -10,9 +10,6 @@ URL = 'https://github.com/mwolfe03/ChemRiskPredict'
 LICENSE = 'MIT'
 KEYWORDS = ['chemistry', 'risk prediction', 'hazard prediction, cheminformatics']
 
-# Read the long description from README.md
-with open('README.md', 'r', encoding='utf-8') as f:
-    LONG_DESCRIPTION = f.read()
 
 # Define dependencies
 INSTALL_REQUIRES = [
