@@ -191,9 +191,11 @@ def hazard_model_testing(testing_df: pd.DataFrame=default_testing_data_df,
 
         for hazard in predicted_hazard_column_name_list:
             # prediction is either 1 or 0
-            prediction = this_predicted_hazard_df[hazard].iloc[0]
+            prediction = int(this_predicted_hazard_df[hazard].iloc[0])
             # actual is either 1 or 0
             actual = row.get(hazard)
+            if type(actual) == str:
+                actual = int(actual)
             if type(actual) != int:
                 actual = 0
 
