@@ -333,12 +333,13 @@ def update_existing_ids_dataframe_from_cids(main_df: pd.DataFrame, new_compound_
 
     try:
         new_df = create_dataframe_from_cids(new_compound_IDs, save_to_csv=False)
+
     except ValueError:
         print("Issue with new compound IDs")
         return False
 
     try:
-        update_existing_dataframe_from_dataframe(main_df, new_df)
+        return update_existing_dataframe_from_dataframe(main_df, new_df)
 
     except ValueError:
         print("Issue combining dataframes")
