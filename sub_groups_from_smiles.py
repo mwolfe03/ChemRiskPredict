@@ -34,12 +34,13 @@ def smiles_to_sub_groups(SMILES_string : str) -> tuple|bool:
 def subgroups_from_SMILES(SMILES_string: str) -> list:
     subgroup_index_list = []
     index_to_group_dict = {}
-    if "1" in SMILES_string: # checks if there are any rings
+
+    if "1" in SMILES_string:  # checks if there are any rings
         ring_indices_lists = ring_handle.ring_handling_rdkit(SMILES_string)
         index_to_group_dict = ring_handle.create_dict_of_ring_indices(ring_indices_lists)
         ring_num = 1
         for ring_indices in ring_indices_lists:
-            subgroup_index_list.append([ring_num, ring_indices])
+            subgroup_index_list.append((str(ring_num), ring_indices))
             ring_num += 1
 
     bond_type_tuple = ("=", "#")
@@ -55,7 +56,7 @@ def subgroups_from_SMILES(SMILES_string: str) -> list:
         if i in index_to_group_dict:
             # With the exception of rings, no atom/bond index should appear in more than one group.
             # An atom/bond index can be in 1 group OR in 1 or more rings
-            # everything before this should be it's own group
+            # everything before this should be its own group
             if len(current_sub_group) > 0:
                 current_group_ascii += 1
                 current_group_name = chr(current_group_ascii)
@@ -68,15 +69,16 @@ def subgroups_from_SMILES(SMILES_string: str) -> list:
             # everything before this should be its own group
             # in theory, current_sub_group should always be a list of len 0 here
             if len(current_sub_group) > 0:
-                subgroup_index_list.append(current_sub_group)
                 current_group_name = chr(current_group_ascii)
                 subgroup_index_list.append((current_group_name, current_sub_group))
+                current_group_ascii += 1
+                current_group_name = chr(current_group_ascii)
             current_sub_group = []
             continue
 
         elif char in grouping_type_tuple:
             if char == "(":
-                current_sub_group.append(i)     # including opening now helps with finding neighbors later
+                current_sub_group.append(i)  # including opening now helps with finding neighbors later
             # leaves as list for now
             subgroup_index_list.append((current_group_name, current_sub_group))
             previous_sub_group = current_sub_group
@@ -87,18 +89,16 @@ def subgroups_from_SMILES(SMILES_string: str) -> list:
 
             current_group_ascii += 1
             current_group_name = chr(current_group_ascii)
-        else:    # wanted character types to represent a subgroup
+        else:  # wanted character types to represent a subgroup
             current_sub_group.append(i)  # add index of char to list
             index_to_group_dict[i] = [current_group_name]
 
-        if i+1 == SMILES_length: # for items at the very end of the string
+        if i + 1 == SMILES_length:  # for items at the very end of the string
             # leave as a list for now
             subgroup_index_list.append((current_group_name, current_sub_group))
 
     subgroup_index_list = clean_subgroup_index_list(subgroup_index_list, SMILES_string)
     return subgroup_index_list
-
-
 
 def clean_subgroup_index_list(subgroup_index_list: list, SMILES_string: str) -> list:
     """
@@ -108,19 +108,20 @@ def clean_subgroup_index_list(subgroup_index_list: list, SMILES_string: str) -> 
 
     groups_to_remove = []
     for subgroup_tuple in subgroup_index_list:
-        tuple_of_indices = subgroup_tuple[1] # index 0 is the group name
+        tuple_of_indices = subgroup_tuple[1]  # index 0 is the group name
+        if not isinstance(tuple_of_indices, list):
+            print(f"Error: Expected list, got {type(tuple_of_indices)} at {subgroup_tuple}")
         length_tuple_of_indices = len(tuple_of_indices)
 
         if length_tuple_of_indices == 0:
             groups_to_remove.append((subgroup_tuple))
 
-        elif length_tuple_of_indices == 1 and (not SMILES_string[tuple_of_indices[0]].isalpha()):   # remove any unhelpful single item tuples
+        elif length_tuple_of_indices == 1 and (not SMILES_string[tuple_of_indices[0]].isalpha()):  # remove any unhelpful single item tuples
             groups_to_remove.append((subgroup_tuple))
 
     for bad_group in groups_to_remove:
         subgroup_index_list.remove(bad_group)
     return subgroup_index_list
-
 
 
 def create_group_dict(subgroup_index_list: list) -> dict:
