@@ -383,12 +383,12 @@ def update_existing_dataframe_from_dataframe(main_df: pd.DataFrame, second_df: p
         # Step 1: Add missing columns from main_df to second_df and set them to 0
         for col in main_df.columns:
             if col not in second_df.columns:
-                second_df[col] = 0
+                second_df.loc[:, col] = 0
 
         # Step 2: Add missing columns from second_df to main_df and set them to 0
         for col in second_df.columns:
             if col not in main_df.columns:
-                main_df[col] = 0
+                main_df.loc[:, col] = 0
 
         # Step 3: Ensure both dataframes have the same columns and order
         main_df = main_df[sorted(main_df.columns, key=str)]
