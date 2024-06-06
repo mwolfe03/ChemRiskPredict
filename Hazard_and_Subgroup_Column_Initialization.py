@@ -11,6 +11,8 @@ import warnings
 # These performance errors will be looked into in the future, but for now it works
 warnings.filterwarnings("ignore", category=pd.errors.PerformanceWarning)
 warnings.simplefilter('ignore', category=pd.errors.SettingWithCopyWarning)
+# this gets raised by .applymap(), but the version of pandas on google collab crashes using .map()
+warnings.simplefilter('ignore', category=FutureWarning)
 
 
 
@@ -339,7 +341,7 @@ def update_existing_ids_dataframe_from_cids(main_df: pd.DataFrame, new_compound_
         return False
 
     try:
-        return update_existing_dataframe_from_dataframe(main_df, new_df)
+        return update_existing_dataframe_from_dataframe(main_df, new_df, save_to_csv=True, csv_name=csv_name)
 
     except ValueError:
         print("Issue combining dataframes")
