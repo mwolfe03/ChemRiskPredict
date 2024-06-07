@@ -25,7 +25,7 @@ except FileNotFoundError:
 
 def determine_potential_hazards_from_dataframe(canonical_smiles: str,
                                                main_df: pd.DataFrame=default_data_df,
-                                               min_probability: float=.5, num_neighbors: int=10, algorithm: str= "auto",
+                                               min_probability: float=.3, num_neighbors: int=5, algorithm: str= "auto",
                                                metric: str="cosine") \
                                                -> pd.DataFrame:
     """
@@ -160,8 +160,8 @@ def pull_hazards_from_dataframe(index_list: list, main_df: pd.DataFrame,
 
 
 def hazard_model_testing(testing_df: pd.DataFrame=default_testing_data_df,
-                         main_df: pd.DataFrame=default_data_df, min_probability: float=.5,
-                         num_neighbors: int=10, algorithm: str= "auto", metric: str="cosine") -> pd.DataFrame:
+                         main_df: pd.DataFrame=default_data_df, min_probability: float=.3,
+                         num_neighbors: int=5, algorithm: str= "auto", metric: str="cosine") -> pd.DataFrame:
     """
     Input: testing_df is the pd.DataFrame that will be used to test a parameter set's effectiveness (The rest of these
            optional inputs are said parameters that are being tested). main_df is the dataframe that will be used to fit
