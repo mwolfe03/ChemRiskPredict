@@ -1,5 +1,6 @@
 import pandas as pd
 import re
+import hashlib
 
 import sub_groups_from_smiles as subgroups
 import Data_Collection_from_Pubchem as pubchem_coll
@@ -165,8 +166,12 @@ def fit_dataframes(this_smiles_df: pd.DataFrame, cleaned_main_df: pd.DataFrame) 
             columns added and set to zero. Both DataFrames have the same columns and are in the same order
     """
 
+    # ensure all columns are strings
+    this_smiles_df.columns = this_smiles_df.columns.astype(str)
+    cleaned_main_df.columns = cleaned_main_df.columns.astype(str)
+
     # removes all columns not in this_smiles_df that are sum to less than 2
-    cleaned_filtered_main_df = filter_columns_by_sum_and_input(cleaned_main_df, this_smiles_df)
+    cleaned_filtered_main_df = filter_columns_by_sum_and_input(main_df=cleaned_main_df, second_df=this_smiles_df)
 
     # Get the common columns between this_smiles_df and cleaned_main_df
     common_columns = this_smiles_df.columns.intersection(cleaned_main_df.columns)
@@ -195,9 +200,9 @@ def hash_smiles_group(subgroup: str,
            default
     Output: hash representing the input subgroup
 
-    Ex rotation_matters: if False, "ABCDE" and "DEABC" will map to the same hashcode and thus be counted as the same
-                        group. If True, they will map to different hashcodes. Regardless of rotation_matters,
-                        "0ABCDE" and "0DEABC" will map to the same hashcode as they both represent a ring of the same
+    Ex rotation_matters: if False, "ABCDE" and "DEABC" will map to the same hash and thus be counted as the same
+                        group. If True, they will map to different hash. Regardless of rotation_matters,
+                        "0ABCDE" and "0DEABC" will map to the same hash as they both represent a ring of the same
                         components in the same order. The "0" at index 0 marks the subgroup as a ring.
     """
 
@@ -217,8 +222,9 @@ def hash_smiles_group(subgroup: str,
     else:
         pre_hashed_key = str(is_ring) + subgroup
 
-    hashed = hash(pre_hashed_key)
-    return hashed
+    hashed = consistent_hash(pre_hashed_key)
+
+    return str(hashed)
 
 
 
@@ -236,8 +242,9 @@ def hash_smiles_group_combination(group_combo: tuple,
     group_2_hash = hash_smiles_group(group_combo[1], rotation_matters)
 
     pre_hashed_key = min((group_1_hash + group_2_hash), (group_2_hash + group_1_hash))
+    hashed_key = consistent_hash(pre_hashed_key)
 
-    return hash(pre_hashed_key)
+    return str(hashed_key)
 
 
 
@@ -245,7 +252,7 @@ def create_grouping_columns(df: pd.DataFrame,
                             group_hashs_list_column_name: str="smiles_group_hash_list") -> bool:
     """
     Input: df is a pd.DataFrame containing a column that contains a list of subgroup hash's
-    Output: bool of True if df was successfully mutated to include and update subgroup hashcode columns, False otherwise
+    Output: bool of True if df was successfully mutated to include and update subgroup hash columns, False otherwise
     """
 
     try:
@@ -419,6 +426,47 @@ def filter_columns_by_sum_and_input(main_df: pd.DataFrame, second_df: pd.DataFra
     """
     columns_to_keep = []
     for col in main_df.columns:
-        if main_df[col].sum() >= 2 or col in second_df.columns:
+        if main_df[col].sum() >= 2 or (col in second_df.columns):
             columns_to_keep.append(col)
     return main_df[columns_to_keep]
+
+
+
+def add_hazard_and_hash_columns_from_csv(csv_name: str,
+                                         drop_empty_hazard_rows: bool=True,
+                                         save_to_csv: bool=True,
+                                         ) -> pd.DataFrame|bool:
+
+    try:
+        df = pd.read_csv(csv_name)
+
+        # Collect grouping data
+        initialize_grouping_data(df)
+
+        # Removes rows that don't have any hazards attached. Currently, there is no way to differentiate
+        # between that chemicals that are safe, and chemicals that simply do not have any hazard data.
+        if drop_empty_hazard_rows:
+            df = df[df['Hazards'] != '']
+
+        # Save for later use
+        if save_to_csv:
+            df.to_csv(csv_name, index=False)
+        columns_to_remove = ["smiles_group_hash_list", "smiles_group_combination_hash_list"]
+        df = df.drop(columns=columns_to_remove, errors='ignore')
+
+        return df
+
+    except ValueError:
+        return False
+
+
+
+def consistent_hash(input_string):
+    """
+    Input: input_string is a string.
+    Output: hash representing input_string. Hash is consistently calculated
+    """
+    # Create a hashlib md5 hash object
+    hash_object = hashlib.md5(input_string.encode())
+    # Generate a hash value in hexadecimal format
+    return hash_object.hexdigest()

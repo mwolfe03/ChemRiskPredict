@@ -11,7 +11,7 @@ warnings.filterwarnings("ignore", category=pd.errors.PerformanceWarning)
 
 # Initializes default_dataframe that comes with the package
 try:
-    default_data_df = pd.read_csv("default_compound_data.csv")
+    default_data_df = pd.read_csv("default_training_compound_data.csv")
 except FileNotFoundError:
     default_data_df = None
 
@@ -39,6 +39,7 @@ def determine_potential_hazards_from_dataframe(canonical_smiles: str,
     """
 
     main_df_cloned = main_df.copy()
+
     this_smiles_df = data_init.convert_smiles_to_dataframe(canonical_smiles)
 
     cleaned_main_df = clean_data_frame(main_df, limit_num_groups=False)
@@ -55,6 +56,7 @@ def determine_potential_hazards_from_dataframe(canonical_smiles: str,
     nn_model = NearestNeighbors(n_neighbors=num_neighbors, algorithm=algorithm, metric=metric).fit(finished_main_df)
     stuff = nn_model.kneighbors(this_smiles_finished_df)
     neighbors_indices = stuff[1]
+    #print(neighbors_indices)
     neighbor_scores = stuff[0]
 
     hazard_probability_dict = pull_hazards_from_dataframe(neighbors_indices[0], main_df_cloned)
