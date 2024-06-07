@@ -137,8 +137,9 @@ def pull_hazards_from_dataframe(index_list: list, main_df: pd.DataFrame,
     """
 
     if hazard_list is None:
-        hazard_list = ["AcuteToxic", "Flammable", "HealthHazard", "Irritant", "Corrosive",
-                       "EnvironmentalHazard", "CompressedGas"]
+
+        hazard_list = ["AcuteToxic", "Flammable", "HealthHazard", "Corrosive",
+                       "EnvironmentalHazard"]
 
     filtered_df = main_df.iloc[index_list]
     len_index_list = len(index_list) # this is the number of neighbors we are using
