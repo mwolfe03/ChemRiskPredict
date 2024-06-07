@@ -35,7 +35,10 @@ def create_dataframe_from_cids(compound_IDs: list,
 
         # Loop through each compound ID and fetch data
         for compound_ID in compound_IDs:
-            compound_data = pubchem_coll.fetch_compound_data(compound_ID, wait_time)
+            try:
+                compound_data = pubchem_coll.fetch_compound_data(compound_ID, wait_time)
+            except KeyError:
+                continue
 
             all_data.append(compound_data)
 

@@ -25,7 +25,8 @@ except FileNotFoundError:
 
 def determine_potential_hazards_from_dataframe(canonical_smiles: str,
                                                main_df: pd.DataFrame=default_data_df,
-                                               min_probability: float=.5, num_neighbors: int=10, algorithm: str= "auto") \
+                                               min_probability: float=.5, num_neighbors: int=10, algorithm: str= "auto",
+                                               metric: str="cosine") \
                                                -> pd.DataFrame:
     """
     Input: canonical_smiles is a str. main_df is the dataframe that will be used to fit the model that predicts the
@@ -51,7 +52,7 @@ def determine_potential_hazards_from_dataframe(canonical_smiles: str,
     this_smiles_finished_df.columns = this_smiles_finished_df.columns.astype(str)
     finished_main_df.columns = finished_main_df.columns.astype(str)
 
-    nn_model = NearestNeighbors(n_neighbors=num_neighbors, algorithm=algorithm, metric="cosine").fit(finished_main_df)
+    nn_model = NearestNeighbors(n_neighbors=num_neighbors, algorithm=algorithm, metric=metric).fit(finished_main_df)
     stuff = nn_model.kneighbors(this_smiles_finished_df)
     neighbors_indices = stuff[1]
     neighbor_scores = stuff[0]
@@ -157,7 +158,7 @@ def pull_hazards_from_dataframe(index_list: list, main_df: pd.DataFrame,
 
 def hazard_model_testing(testing_df: pd.DataFrame=default_testing_data_df,
                          main_df: pd.DataFrame=default_data_df, min_probability: float=.5,
-                         num_neighbors: int=10, algorithm: str= "auto") -> pd.DataFrame:
+                         num_neighbors: int=10, algorithm: str= "auto", metric: str="cosine") -> pd.DataFrame:
     """
     Input: testing_df is the pd.DataFrame that will be used to test a parameter set's effectiveness (The rest of these
            optional inputs are said parameters that are being tested). main_df is the dataframe that will be used to fit
@@ -182,7 +183,7 @@ def hazard_model_testing(testing_df: pd.DataFrame=default_testing_data_df,
         this_predicted_hazard_df = determine_potential_hazards_from_dataframe(this_canonical_smiles, main_df=main_df,
                                                                                min_probability=min_probability,
                                                                                num_neighbors=num_neighbors,
-                                                                               algorithm=algorithm)
+                                                                               algorithm=algorithm, metric=metric)
 
         predicted_hazard_column_name_list = this_predicted_hazard_df.columns
 
