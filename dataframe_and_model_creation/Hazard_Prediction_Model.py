@@ -11,7 +11,7 @@ warnings.filterwarnings("ignore", category=pd.errors.PerformanceWarning)
 
 # Initializes default_dataframe that comes with the package
 try:
-    default_data_df = pd.read_csv("../default_data/default_training_compound_data.csv")
+    default_data_df = pd.read_csv("default_data/default_training_compound_data.csv")
 except FileNotFoundError:
     print("failed to load default training data")
     default_data_df = None
