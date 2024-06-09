@@ -25,7 +25,7 @@ This project is licensed under the MIT License
 For any inquiries or issues, please contact the author:
 
 - Authors: Mateo Wolfe, Peter Reist
-- Email: mwolfe08@calpoly.edu, pbers.no8@gmail.com
+- Emails: mwolfe08@calpoly.edu, pbers.no8@gmail.com
 
 ## Acknowledgments
 Data is collected from PubChem's PUG-REST API: https://pubchem.ncbi.nlm.nih.gov/rest/pug_view
