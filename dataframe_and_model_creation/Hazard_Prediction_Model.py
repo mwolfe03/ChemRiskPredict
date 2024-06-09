@@ -18,7 +18,7 @@ except FileNotFoundError:
 
 # Initializes default_testing_dataframe that comes with the package
 try:
-    default_testing_data_df = pd.read_csv("../default_data/default_testing_compound_data.csv")
+    default_testing_data_df = pd.read_csv("default_data/default_testing_compound_data.csv")
 except FileNotFoundError:
     print("failed to load default testing data")
     default_testing_data_df = None
