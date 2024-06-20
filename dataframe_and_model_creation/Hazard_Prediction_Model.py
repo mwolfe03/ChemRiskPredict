@@ -77,56 +77,6 @@ def determine_potential_hazards_from_dataframe(canonical_smiles: str,
 
 
 
-def clean_data_frame(main_df: pd.DataFrame,
-                     limit_num_groups: bool=True, num_groups_to_include: int=200,
-                     group_counts_matters: bool=False, columns_to_drop=None) -> pd.DataFrame:
-    """
-    Input: main_df is the dataframe that will be used to fit the model that predicts the
-           most similar compounds. limit_num_groups is a bool that determines whether to limit the number of
-           subgroups and subgroup combinations group columns. if limit_num_groups = True, then num_groups_to_include
-           is an int that determines how many groups to include. group_counts_matters determines whether the
-           number of occurrences a subgroup/subgroup combination has in a molecule has any effect on the model.
-           columns_to_drop is a list of names of columns to drop that are unneeded (this is for all columns other than
-           group columns)
-    Output: pd.DataFrame containing only the desired columns to be fit with the model
-    """
-    # drop molecules that did not have any hazard data associated with them
-    if columns_to_drop is None:
-        columns_to_drop = ["IUPAC Name", "Canonical SMILES", "Hazards",
-                           "could_not_collect_grouping_data", "no_hazard_data_to_collect", ]
-    training_df = main_df[main_df["Hazards"] != ""] #check, might not need
-
-
-    # drop molecules that were unsuccessfully parsed for grouping data
-    training_df = training_df[training_df["could_not_collect_grouping_data"] != 1]
-    # drop unwanted columns
-    training_df = training_df.drop(columns=columns_to_drop, errors='ignore')
-    # converts all non 0 values to 1 if group_count_matters
-    # Ex: if group_counts_matters is True, then a molecule containing 100 =O groups and a molecule
-    # containing 1 =O group will have both be set to 1 for  the column corresponding to =O
-    #if not group_counts_matters:
-                                    # .applymap() used inplace of .map() because of google collab having issues with .map()
-           # training_df = training_df.applymap(lambda x: 1 if x != 0 else 0)
-    #print("--- %s BC4 ---" % (time.time() - start_time))
-
-    # Calculate the number of non-zero values for each column
-    non_zero_counts = (training_df != 0).sum()
-    #print("--- %s BC5 ---" % (time.time() - start_time))
-    # Sort columns by the number of non-zero values in descending order
-    sorted_columns = non_zero_counts.sort_values(ascending=False)
-    #print("--- %s BC6 ---" % (time.time() - start_time))
-    if limit_num_groups:
-        top_columns = sorted_columns.head(num_groups_to_include).index
-    else:
-        # does not limit the num of subgroup group columns
-        top_columns = sorted_columns.index
-    #print("--- %s BC7 ---" % (time.time() - start_time))
-    finished_training_df = training_df[top_columns]
-    #print("--- %s BC8 ---" % (time.time() - start_time))
-    return finished_training_df
-
-
-
 def pull_hazards_from_dataframe(index_list: list, main_df: pd.DataFrame,
                                 hazard_list=None) -> dict:
     """
@@ -138,7 +88,7 @@ def pull_hazards_from_dataframe(index_list: list, main_df: pd.DataFrame,
     if hazard_list is None:
 
         hazard_list = ["AcuteToxic", "Flammable", "HealthHazard", "Corrosive",
-                       "EnvironmentalHazard"]
+                       "EnvironmentalHazard", "Irritant", "CompressedGas", "Oxidizer", "Explosive", "CompressedGas"]
 
     filtered_df = main_df.iloc[index_list]
     len_index_list = len(index_list) # this is the number of neighbors we are using
