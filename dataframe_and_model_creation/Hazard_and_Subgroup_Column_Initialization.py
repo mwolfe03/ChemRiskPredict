@@ -1,19 +1,13 @@
 import pandas as pd
 import re
-import hashlib
 
-from ChemRiskPredict.smiles_to_groupings import sub_groups_from_smiles as subgroups
-from ChemRiskPredict.dataframe_and_model_creation import Data_Collection_from_Pubchem as pubchem_coll
+
+from smiles_to_groupings import sub_groups_from_smiles as subgroups
+from dataframe_and_model_creation import Data_Collection_from_Pubchem as pubchem_coll
 
 import warnings
-
-# Suppress the specific PerformanceWarning from pandas
-# These performance errors will be looked into in the future, but for now it works
+# This warning is raised because of how fragmented the dataFrame is.
 warnings.filterwarnings("ignore", category=pd.errors.PerformanceWarning)
-warnings.simplefilter('ignore', category=pd.errors.SettingWithCopyWarning)
-# this gets raised by .applymap(), but the version of pandas on google collab crashes using .map()
-warnings.simplefilter('ignore', category=FutureWarning)
-
 
 
 def create_dataframe_from_cids(compound_IDs: list,
@@ -27,7 +21,7 @@ def create_dataframe_from_cids(compound_IDs: list,
            chemicals that have no hazards because they are safe and chemicals that have no hazards because there simply
            is not enough data.
     Output: pd.DataFrame of compound data including a column for each type of hazard, and columns of group
-            and group combination hash keys
+            and group combinations
     """
 
     try:
@@ -56,7 +50,7 @@ def create_dataframe_from_cids(compound_IDs: list,
         # Save for later use
         if save_to_csv:
             df.to_csv(csv_name, index=False)
-        columns_to_remove = ["smiles_group_hash_list", "smiles_group_combination_hash_list"]
+        columns_to_remove = ["smiles_group_key_list", "smiles_group_combination_key_list", ""]
         df = df.drop(columns=columns_to_remove, errors='ignore')
 
         return df
@@ -65,39 +59,39 @@ def create_dataframe_from_cids(compound_IDs: list,
 
 
 
-def generate_grouping_hash_lists_from_df(df: pd.DataFrame,
-                                         Canonical_SMILES_column_name: str="Canonical SMILES",
-                                         create_columns: bool=True) -> bool:
+def generate_grouping_lists_from_df(df: pd.DataFrame,
+                                    Canonical_SMILES_column_name: str="Canonical SMILES",
+                                    create_columns: bool=True) -> bool:
     """
     Input: df is a pd.DataFrame including a column of Canonical SMILES strings. Canonical_SMILES_column_name is the
            column name of the column containing the Canonical SMILES strings, it is "Canonical SMILES" by default.
-           create_columns is a bool that determines if the columns "smiles_group_hash_list",
-           "smiles_group_combination_hash_list", and "could_not_collect_grouping_data" need to be initialized.
+           create_columns is a bool that determines if the columns "smiles_group_key_list",
+           "smiles_group_combination_key_list", and "could_not_collect_grouping_data" need to be initialized.
            create_columns is True by default
-    Output: bool that is True if columns were successfully created and/or updated to include hash lists, False
+    Output: bool that is True if columns were successfully created and/or updated to include key lists, False
             otherwise
     """
 
     try:
         if create_columns:
-            df["smiles_group_hash_list"] = [[] for _ in range(len(df))]
-            df["smiles_group_combination_hash_list"] = [[] for _ in range(len(df))]
+            df["smiles_group_key_list"] = [[] for _ in range(len(df))]
+            df["smiles_group_combination_key_list"] = [[] for _ in range(len(df))]
             df["could_not_collect_grouping_data"] = 0
 
         for index, row in df.iterrows():
             canonical_smiles = row[Canonical_SMILES_column_name]
 
-            group_hash_lists = generate_grouping_hash_lists_from_SMILES_string(canonical_smiles)
+            group_key_lists = generate_grouping_key_lists_from_SMILES_string(canonical_smiles)
 
-            if group_hash_lists == False:
+            if group_key_lists == False:
                 df.at[index, "could_not_collect_grouping_data"] = 1
                 continue
 
-            smiles_group_hash_list = group_hash_lists[0]
-            smiles_group_combination_hash_list = group_hash_lists[1]
+            smiles_group_key_list = group_key_lists[0]
+            smiles_group_combination_key_list = group_key_lists[1]
 
-            df.at[index, "smiles_group_hash_list"] = smiles_group_hash_list
-            df.at[index, "smiles_group_combination_hash_list"] = smiles_group_combination_hash_list
+            df.at[index, "smiles_group_key_list"] = smiles_group_key_list
+            df.at[index, "smiles_group_combination_key_list"] = smiles_group_combination_key_list
 
         return True
     except ValueError:
@@ -105,10 +99,10 @@ def generate_grouping_hash_lists_from_df(df: pd.DataFrame,
 
 
 
-def generate_grouping_hash_lists_from_SMILES_string(canonical_smiles: str) -> tuple|bool:
+def generate_grouping_key_lists_from_SMILES_string(canonical_smiles: str) -> tuple | bool:
     """
     Input: canonical_smiles of type str
-    Output: tuple containing a hashlist of the different subgroups at index 0, and a hashlist of the different subgroup
+    Output: tuple containing a key list of the different subgroups at index 0, and a key list of the different subgroup
             combinations at index 1. False if no subgroups could be pulled
     """
     group_list_info = subgroups.smiles_to_sub_groups(canonical_smiles)
@@ -120,20 +114,20 @@ def generate_grouping_hash_lists_from_SMILES_string(canonical_smiles: str) -> tu
     group_list = group_list_info[0]
     group_combination_list = group_list_info[1]
 
-    smiles_group_hash_list = []
-    smiles_group_combination_hash_list = []
+    smiles_group_key_list = []
+    smiles_group_combination_key_list = []
 
     # get data for individual groups
     for group in group_list:
-        group_hash_key = hash_smiles_group(group)
-        smiles_group_hash_list.append(group_hash_key)
+        group_key = normalize_smiles_group_key(group)
+        smiles_group_key_list.append(group_key)
 
     # get data for group combinations
     for group_combo in group_combination_list:
-        group_combo_hash_key = hash_smiles_group_combination(group_combo)
-        smiles_group_combination_hash_list.append(group_combo_hash_key)
+        group_combo_key = normalize_smiles_group_combination_key(group_combo)
+        smiles_group_combination_key_list.append(group_combo_key)
 
-    return smiles_group_hash_list, smiles_group_combination_hash_list
+    return smiles_group_key_list, smiles_group_combination_key_list
 
 
 
@@ -141,21 +135,58 @@ def convert_smiles_to_dataframe(canonical_smiles: str) -> pd.DataFrame:
     """
     Input: canonical_smiles is a string.
     Output: A pd.DataFrame with only one row referring to canonical_smiles. pd.Dataframe contains columns of the
-            hashed subgroups and subgroup combinations
+            normalized subgroups and subgroup combinations keys
     """
 
-    hash_dict = {}
-    hash_lists = generate_grouping_hash_lists_from_SMILES_string(canonical_smiles)
-    hash_lists_combined = hash_lists[0] + hash_lists[1]
-    for hash in hash_lists_combined:
-        if hash in hash_dict:
-            hash_dict[hash][0] += 1
+    key_dict = {}
+    key_lists = generate_grouping_key_lists_from_SMILES_string(canonical_smiles)
+    key_lists_combined = key_lists[0] + key_lists[1]
+    for key in key_lists_combined:
+        if key in key_dict:
+            key_dict[key][0] += 1
         else:
-            hash_dict[hash] = [1]
+            key_dict[key] = [1]
 
-    df = pd.DataFrame(hash_dict)
+    df = pd.DataFrame(key_dict)
 
     return df
+
+
+
+def convert_smiles_to_dict(canonical_smiles: str) -> dict:
+    """
+    Input: canonical_smiles is a string.
+    Output: A dict containing keys of all subgroups and subgroup combinations for the specific smiles structure
+    """
+
+    group_key_dict = {}
+    key_lists = generate_grouping_key_lists_from_SMILES_string(canonical_smiles)
+    key_lists_combined = key_lists[0] + key_lists[1]
+    for key in key_lists_combined:
+        if key in group_key_dict:
+            group_key_dict[key] += 1
+        else:
+            group_key_dict[key] = 1
+
+    return group_key_dict
+
+
+
+def clean_smiles_dict(smiles_dict: dict, main_df: pd.DataFrame) -> dict:
+    """
+    Input: smiles_dict: dict with keys representing groups and group pairs. main_df: pd.DataFrame of the data that will
+           compose the model. This should only contain key columns.
+    Output: smiles_dict with groups missing from main_df removed
+    """
+    main_df_columns = main_df.columns
+    keys_to_pop =[]
+    for key in smiles_dict:
+        if key not in main_df_columns:
+            keys_to_pop.append(key)
+    for key in keys_to_pop:
+        smiles_dict.pop(key)
+
+    return smiles_dict
 
 
 
@@ -191,86 +222,81 @@ def fit_dataframes(this_smiles_df: pd.DataFrame, cleaned_main_df: pd.DataFrame) 
 
 
 
-def hash_smiles_group(subgroup: str,
-                      rotation_matters: bool=False) -> int|bool:
+def normalize_smiles_group_key(subgroup: str,
+                               rotation_matters: bool=False, include_key: bool=True) -> str|bool:
     """
     Input: subgroup is string representation of a subgroup. These should have been
            created by subgroups.smiles_to_sub_groups(). rotation_matters is a bool that represents whether
            groups other than rings that maintain the same order but are shifted can map to the same group, is False by
            default
-    Output: hash representing the input subgroup
-
-    Ex rotation_matters: if False, "ABCDE" and "DEABC" will map to the same hash and thus be counted as the same
-                        group. If True, they will map to different hash. Regardless of rotation_matters,
-                        "0ABCDE" and "0DEABC" will map to the same hash as they both represent a ring of the same
-                        components in the same order. The "0" at index 0 marks the subgroup as a ring.
+    Output: str representing the input subgroup
     """
 
     # check if subgroup is empty
     if subgroup == "":
         return False
 
-    is_ring = False
+    # determine if the group is a ring. A 0 at index 0 is a marker for a ring
+    is_ring = ""
     if subgroup[0] == "0":
-        is_ring = True
+        is_ring = "ring "
         subgroup = subgroup[1:]
 
     if not rotation_matters or is_ring:
         rotations = [subgroup[i:] + subgroup[:i] for i in range(len(subgroup))]
-        pre_hashed_key = str(is_ring) + min(rotations)
-
+        normalized_group_key = str(is_ring) + min(rotations)
     else:
-        pre_hashed_key = str(is_ring) + subgroup
+        normalized_group_key = str(is_ring) + subgroup
 
-    hashed = consistent_hash(pre_hashed_key)
+    # include the term "key: " at the start of the string. This is important for the program to identify columns that are apart of knn model
+    if include_key:
+        normalized_group_key = "key: " + normalized_group_key
 
-    return str(hashed)
+    return str(normalized_group_key)
 
 
 
-def hash_smiles_group_combination(group_combo: tuple,
-                                  rotation_matters: bool=False) -> int:
+def normalize_smiles_group_combination_key(group_combo: tuple,
+                                           rotation_matters: bool=False) -> str:
     """
     Input: group_combo is a tuple of length two containing two subgroups of the same molecule. These should have been
            created by subgroups.smiles_to_sub_groups(). rotation_matters is a bool that is False by default.
            rotation_matters determines whether non ring subgroups with the same elements and the same order, but are
            shifted, represent the same subgroup.
-    Output: Hash code to represent the subgroup combination
+    Output: str to represent the subgroup combination
     """
 
-    group_1_hash = hash_smiles_group(group_combo[0], rotation_matters)
-    group_2_hash = hash_smiles_group(group_combo[1], rotation_matters)
+    group_1_key = normalize_smiles_group_key(group_combo[0], rotation_matters, include_key=False)
+    group_2_key = normalize_smiles_group_key(group_combo[1], rotation_matters, include_key=False)
 
-    pre_hashed_key = min((group_1_hash + group_2_hash), (group_2_hash + group_1_hash))
-    hashed_key = consistent_hash(pre_hashed_key)
-
-    return str(hashed_key)
+    normalized_group_key = "key: " + min(("(" + group_1_key + ", " + group_2_key + ")"), ("(" + group_2_key + ", " + group_1_key + ")"))
+    return str(normalized_group_key)
 
 
 
 def create_grouping_columns(df: pd.DataFrame,
-                            group_hashs_list_column_name: str="smiles_group_hash_list") -> bool:
+                            group_key_list_column_name: str="smiles_group_key_list") -> bool:
     """
-    Input: df is a pd.DataFrame containing a column that contains a list of subgroup hash's
-    Output: bool of True if df was successfully mutated to include and update subgroup hash columns, False otherwise
+    Input: df is a pd.DataFrame containing a column that contains a list of subgroup keys
+    Output: bool of True if df was successfully mutated to include and update subgroup key columns, False otherwise
     """
 
     try:
         for index, row in df.iterrows():
-            hash_keys = row[group_hashs_list_column_name]
+            group_keys = row[group_key_list_column_name]
 
-            # For each hash key in the list
-            for hash_key in hash_keys:
+            # For each group key in the list
+            for group_key in group_keys:
                 # Check if the column exists
 
-                if hash_key in df.columns:
+                if group_key in df.columns:
                     # Increment the value in the existing column
-                    df.at[index, hash_key] += 1
+                    df.at[index, group_key] += 1
 
                 else:
                     # Create a new column and initialize it
-                    df[hash_key] = 0  # Initialize the new column with zeros
-                    df.at[index, hash_key] = 1
+                    df[group_key] = 0  # Initialize the new column with zeros
+                    df.at[index, group_key] = 1
 
     except ValueError:
         return False
@@ -287,7 +313,7 @@ def initialize_grouping_data(df: pd.DataFrame,
 
     try:
         split_hazard_data(df)
-        generate_grouping_hash_lists_from_df(df, Canonical_SMILES_column_name)
+        generate_grouping_lists_from_df(df, Canonical_SMILES_column_name)
         create_grouping_columns(df)
         return True
     except ValueError:
@@ -432,10 +458,10 @@ def filter_columns_by_sum_and_input(main_df: pd.DataFrame, second_df: pd.DataFra
 
 
 
-def add_hazard_and_hash_columns_from_csv(csv_name: str,
-                                         drop_empty_hazard_rows: bool=True,
-                                         save_to_csv: bool=True,
-                                         ) -> pd.DataFrame|bool:
+def add_hazard_and_key_columns_from_csv(csv_name: str,
+                                        drop_empty_hazard_rows: bool=True,
+                                        save_to_csv: bool=True,
+                                        ) -> pd.DataFrame|bool:
 
     try:
         df = pd.read_csv(csv_name)
@@ -448,25 +474,14 @@ def add_hazard_and_hash_columns_from_csv(csv_name: str,
         if drop_empty_hazard_rows:
             df = df[df['Hazards'] != '']
 
+        columns_to_remove = ["smiles_group_key_list", "smiles_group_combination_key_list"]
+        df = df.drop(columns=columns_to_remove, errors='ignore')
+
         # Save for later use
         if save_to_csv:
             df.to_csv(csv_name, index=False)
-        columns_to_remove = ["smiles_group_hash_list", "smiles_group_combination_hash_list"]
-        df = df.drop(columns=columns_to_remove, errors='ignore')
 
         return df
 
     except ValueError:
         return False
-
-
-
-def consistent_hash(input_string):
-    """
-    Input: input_string is a string.
-    Output: hash representing input_string. Hash is consistently calculated
-    """
-    # Create a hashlib md5 hash object
-    hash_object = hashlib.md5(input_string.encode())
-    # Generate a hash value in hexadecimal format
-    return hash_object.hexdigest()
